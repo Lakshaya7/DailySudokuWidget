@@ -5,15 +5,23 @@ import json
 import os
 from datetime import date
 
-class DailySudokuWidget:
+class ModernSudokuWidget:
     def __init__(self, root):
         self.root = root
         self.root.title("Daily Sudoku")
         
-        # --- WIDGET MODE SETTINGS ---
-        self.root.overrideredirect(True) # Removes window borders/title bar
-        self.root.attributes("-topmost", True) # Keeps it above other windows
-        self.root.configure(bg="#1e1e1e")
+        # --- UI CONFIGURATION ---
+        self.bg_main = "#121212"      # Deep Black/Gray
+        self.bg_grid = "#1e1e1e"      # Slightly lighter gray for grid
+        self.color_fixed = "#00f0ff"  # Neon Cyan (Daily numbers)
+        self.color_user = "#ffcc00"   # Amber (Your numbers)
+        self.color_solve = "#ff3366"  # Pink/Red (Solved numbers)
+        self.accent = "#333333"       # Border accent
+        
+        # Window Setup
+        self.root.overrideredirect(True)
+        self.root.attributes("-topmost", True)
+        self.root.configure(bg=self.bg_main, highlightthickness=1, highlightbackground="#333")
         
         self.cache_file = "sudoku_cache.json"
         self.cells = {}
@@ -21,14 +29,13 @@ class DailySudokuWidget:
         self.original_puzzle = []
         
         self.load_or_generate_data()
+        self.create_header()
         self.create_grid()
         self.create_controls()
         
-        # Initial position: Right side of screen
-        screen_width = self.root.winfo_screenwidth()
-        self.root.geometry(f"300x420+{screen_width - 320}+50")
-
-        # Make the widget draggable
+        # Position & Draggable Logic
+        screen_w = self.root.winfo_screenwidth()
+        self.root.geometry(f"320x460+{screen_w - 350}+100")
         self.root.bind("<Button-1>", self.start_move)
         self.root.bind("<B1-Motion>", self.do_move)
 
@@ -56,24 +63,76 @@ class DailySudokuWidget:
         cols = [g * base + c for g in shuffle(r_base) for c in shuffle(r_base)]
         nums = shuffle(range(1, side + 1))
         board = [[nums[pattern(r, c)] for c in cols] for r in rows]
-        for p in random.sample(range(side*side), int(side*side * 0.7)):
+        for p in random.sample(range(side*side), int(side*side * 0.65)):
             board[p // side][p % side] = 0
         return board
 
     def load_or_generate_data(self):
-        new_puzzle = self.generate_puzzle()
-        today_str = str(date.today())
+        new_p = self.generate_puzzle()
+        today = str(date.today())
         if os.path.exists(self.cache_file):
             try:
                 with open(self.cache_file, 'r') as f:
                     data = json.load(f)
-                    if data.get("date") == today_str:
+                    if data.get("date") == today:
                         self.board = data.get("current_state")
                         self.original_puzzle = data.get("original")
                         return
             except: pass
-        self.board = [row[:] for row in new_puzzle]
-        self.original_puzzle = [row[:] for row in new_puzzle]
+        self.board = [row[:] for row in new_p]
+        self.original_puzzle = [row[:] for row in new_p]
+
+    def create_header(self):
+        header = tk.Frame(self.root, bg=self.bg_main)
+        header.pack(fill='x', padx=15, pady=(15, 5))
+        
+        tk.Label(header, text="DAILY SUDOKU", bg=self.bg_main, fg="white", 
+                 font=("Impact", 18)).pack(side='left')
+        
+        exit_btn = tk.Label(header, text="✕", bg=self.bg_main, fg="#555", 
+                            font=("Arial", 12, "bold"), cursor="hand2")
+        exit_btn.pack(side='right')
+        exit_btn.bind("<Button-1>", lambda e: self.root.destroy())
+        exit_btn.bind("<Enter>", lambda e: exit_btn.config(fg="white"))
+        exit_btn.bind("<Leave>", lambda e: exit_btn.config(fg="#555"))
+
+    def create_grid(self):
+        grid_container = tk.Frame(self.root, bg=self.accent, padx=1, pady=1)
+        grid_container.pack(pady=10, padx=15)
+
+        for r in range(9):
+            for c in range(9):
+                is_orig = self.original_puzzle[r][c] != 0
+                val = self.board[r][c]
+                
+                # Visual grouping for 3x3 blocks
+                padx = (1, 1) if (c + 1) % 3 != 0 else (1, 3)
+                pady = (1, 1) if (r + 1) % 3 != 0 else (1, 3)
+                
+                cell = tk.Entry(grid_container, width=2, font=('Consolas', 16, 'bold'), 
+                                justify='center', bd=0, bg=self.bg_grid, 
+                                fg=self.color_fixed if is_orig else self.color_user,
+                                insertbackground="white")
+                cell.grid(row=r, column=c, padx=padx, pady=pady, ipady=5)
+                
+                if val != 0: cell.insert(0, str(val))
+                if is_orig: cell.config(state='readonly', readonlybackground=self.bg_grid)
+                
+                self.cells[(r, c)] = cell
+
+    def create_controls(self):
+        btn_frame = tk.Frame(self.root, bg=self.bg_main)
+        btn_frame.pack(fill='x', padx=15, pady=10)
+
+        def create_btn(text, cmd, color):
+            btn = tk.Button(btn_frame, text=text, command=cmd, bg=color, fg="white",
+                            font=("Arial", 9, "bold"), bd=0, pady=8, cursor="hand2",
+                            activebackground="#444", activeforeground="white")
+            btn.pack(side='left', expand=True, fill='x', padx=2)
+            return btn
+
+        create_btn("SAVE PROGRESS", self.save_cache, "#333")
+        create_btn("SOLVE", self.handle_solve, "#007acc")
 
     def save_cache(self):
         current_state = []
@@ -86,31 +145,9 @@ class DailySudokuWidget:
         data = {"date": str(date.today()), "original": self.original_puzzle, "current_state": current_state}
         with open(self.cache_file, 'w') as f:
             json.dump(data, f)
-
-    def create_grid(self):
-        main_frame = tk.Frame(self.root, bg="#333333", padx=2, pady=2)
-        main_frame.pack(pady=10)
-        for r in range(9):
-            for c in range(9):
-                is_orig = self.original_puzzle[r][c] != 0
-                val = self.board[r][c]
-                px = (1, 1) if (c + 1) % 3 != 0 else (1, 3)
-                py = (1, 1) if (r + 1) % 3 != 0 else (1, 3)
-                entry = tk.Entry(main_frame, width=2, font=('Consolas', 14, 'bold'), 
-                                 justify='center', bd=0, bg="#2d2d2d", fg="#ffffff")
-                entry.grid(row=r, column=c, padx=px, pady=py)
-                if val != 0: entry.insert(0, str(val))
-                if is_orig: entry.config(state='readonly', readonlybackground='#444444', fg="#00ffcc")
-                self.cells[(r, c)] = entry
-
-    def create_controls(self):
-        btn_frame = tk.Frame(self.root, bg="#1e1e1e")
-        btn_frame.pack(fill='x', padx=10)
-        style = {"bg": "#444", "fg": "white", "font": ("Arial", 8, "bold"), "bd": 0, "pady": 3}
-        tk.Button(btn_frame, text="SAVE", command=self.save_cache, **style).pack(side='left', expand=True, fill='x', padx=1)
-        tk.Button(btn_frame, text="SOLVE", command=self.handle_solve, **style).pack(side='left', expand=True, fill='x', padx=1)
-        # Added an EXIT button since window borders are gone
-        tk.Button(btn_frame, text="X", command=self.root.destroy, bg="#900", fg="white", bd=0).pack(side='left', padx=1)
+        # Visual feedback
+        self.root.title("Saved!")
+        self.root.after(1000, lambda: self.root.title("Daily Sudoku"))
 
     def handle_solve(self):
         solution = [row[:] for row in self.original_puzzle]
@@ -121,7 +158,7 @@ class DailySudokuWidget:
                         self.cells[(r, c)].config(state='normal')
                         self.cells[(r, c)].delete(0, tk.END)
                         self.cells[(r, c)].insert(0, str(solution[r][c]))
-                        self.cells[(r, c)].config(fg="#ffcc00")
+                        self.cells[(r, c)].config(fg=self.color_solve)
             self.save_cache()
 
     def solve_backtrack(self, b):
@@ -147,5 +184,5 @@ class DailySudokuWidget:
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = DailySudokuWidget(root)
+    app = ModernSudokuWidget(root)
     root.mainloop()
