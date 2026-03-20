@@ -5,22 +5,24 @@ import json
 import os
 from datetime import date
 
-class ModernSudokuWidget:
+class FutureRetroSudoku:
     def __init__(self, root):
         self.root = root
-        self.root.title("Daily Sudoku")
+        self.root.title("NEON SUDOKU")
         
-        # --- UI CONFIGURATION ---
-        self.bg_main = "#121212"      
-        self.bg_grid = "#1e1e1e"      
-        self.color_fixed = "#00f0ff"  # Cyan
-        self.color_user = "#ffcc00"   # Amber
-        self.color_solve = "#ff3366"  # Pink
-        self.accent = "#333333"       
+        # --- SYNTHWAVE PALETTE ---
+        self.bg_dark = "#0d0221"      # Deep Space Purple
+        self.bg_cell = "#120438"      # Cyber Cell Background
+        self.neon_pink = "#ff00ff"    # Major Grid Glow
+        self.neon_cyan = "#00ffff"    # Fixed Numbers
+        self.neon_amber = "#ffcc00"   # User Input
+        self.neon_magenta = "#ea00d9" # Solved State
+        self.grid_dim = "#3d0b5e"     # Minor Grid Lines
         
+        # Window Setup
         self.root.overrideredirect(True)
         self.root.attributes("-topmost", True)
-        self.root.configure(bg=self.bg_main, highlightthickness=1, highlightbackground="#333")
+        self.root.configure(bg=self.bg_dark, highlightthickness=2, highlightbackground=self.neon_pink)
         
         self.cache_file = "sudoku_cache.json"
         self.cells = {}
@@ -32,8 +34,9 @@ class ModernSudokuWidget:
         self.create_grid()
         self.create_controls()
         
+        # Screen Position & Dragging
         screen_w = self.root.winfo_screenwidth()
-        self.root.geometry(f"320x500+{screen_w - 350}+100")
+        self.root.geometry(f"340x540+{screen_w - 380}+80")
         self.root.bind("<Button-1>", self.start_move)
         self.root.bind("<B1-Motion>", self.do_move)
 
@@ -49,10 +52,8 @@ class ModernSudokuWidget:
         self.root.geometry(f"+{x}+{y}")
 
     def generate_puzzle(self, use_daily_seed=True):
-        # If daily, use date as seed. If not, use a random seed.
-        seed = int(date.today().strftime("%Y%m%d")) if use_daily_seed else random.randint(1, 1000000)
+        seed = int(date.today().strftime("%Y%m%d")) if use_daily_seed else random.randint(1, 1e7)
         random.seed(seed)
-        
         base, side = 3, 9
         def pattern(r, c): return (base * (r % base) + r // base + c) % side
         def shuffle(s): return random.sample(s, len(s))
@@ -61,9 +62,7 @@ class ModernSudokuWidget:
         cols = [g * base + c for g in shuffle(r_base) for c in shuffle(r_base)]
         nums = shuffle(range(1, side + 1))
         board = [[nums[pattern(r, c)] for c in cols] for r in rows]
-        
-        # Difficulty: remove 65% of cells
-        for p in random.sample(range(side*side), int(side*side * 0.65)):
+        for p in random.sample(range(side*side), int(side*side * 0.6)):
             board[p // side][p % side] = 0
         return board
 
@@ -78,84 +77,82 @@ class ModernSudokuWidget:
                         self.original_puzzle = data.get("original")
                         return
             except: pass
-        
         new_p = self.generate_puzzle(use_daily_seed=True)
         self.board = [row[:] for row in new_p]
         self.original_puzzle = [row[:] for row in new_p]
 
-    def refresh_new_puzzle(self):
-        """Generates a completely new random puzzle."""
-        new_p = self.generate_puzzle(use_daily_seed=False)
-        self.original_puzzle = [row[:] for row in new_p]
-        self.board = [row[:] for row in new_p]
-        
-        # Update UI Cells
-        for r in range(9):
-            for c in range(9):
-                cell = self.cells[(r, c)]
-                cell.config(state='normal')
-                cell.delete(0, tk.END)
-                val = self.board[r][c]
-                if val != 0:
-                    cell.insert(0, str(val))
-                    cell.config(state='readonly', readonlybackground=self.bg_grid, fg=self.color_fixed)
-                else:
-                    cell.config(fg=self.color_user)
-        
-        # Save this as the "current" state for today
-        self.save_cache()
-
     def create_header(self):
-        header = tk.Frame(self.root, bg=self.bg_main)
-        header.pack(fill='x', padx=15, pady=(15, 5))
-        tk.Label(header, text="SUDOKU", bg=self.bg_main, fg="white", font=("Impact", 20)).pack(side='left')
+        header = tk.Frame(self.root, bg=self.bg_dark)
+        header.pack(fill='x', padx=20, pady=(20, 10))
         
-        exit_btn = tk.Label(header, text="✕", bg=self.bg_main, fg="#555", font=("Arial", 12, "bold"), cursor="hand2")
-        exit_btn.pack(side='right')
-        exit_btn.bind("<Button-1>", lambda e: self.root.destroy())
-        exit_btn.bind("<Enter>", lambda e: exit_btn.config(fg="white"))
-        exit_btn.bind("<Leave>", lambda e: exit_btn.config(fg="#555"))
+        # Futuristic Title
+        tk.Label(header, text="SYSTEM://SUDOKU", bg=self.bg_dark, fg=self.neon_pink, 
+                 font=("Consolas", 16, "bold")).pack(side='left')
+        
+        # Cyber Close Button
+        close_btn = tk.Label(header, text="[X]", bg=self.bg_dark, fg=self.grid_dim, 
+                             font=("Consolas", 12, "bold"), cursor="hand2")
+        close_btn.pack(side='right')
+        close_btn.bind("<Button-1>", lambda e: self.root.destroy())
+        close_btn.bind("<Enter>", lambda e: close_btn.config(fg=self.neon_pink))
+        close_btn.bind("<Leave>", lambda e: close_btn.config(fg=self.grid_dim))
 
     def create_grid(self):
-        grid_container = tk.Frame(self.root, bg=self.accent, padx=1, pady=1)
-        grid_container.pack(pady=10, padx=15)
+        # The main grid container with a "glow" border
+        outer_grid = tk.Frame(self.root, bg=self.neon_pink, padx=1, pady=1)
+        outer_grid.pack(padx=20, pady=10)
+        
+        inner_grid = tk.Frame(outer_grid, bg=self.bg_dark)
+        inner_grid.pack()
 
         for r in range(9):
             for c in range(9):
                 is_orig = self.original_puzzle[r][c] != 0
                 val = self.board[r][c]
-                padx = (1, 1) if (c + 1) % 3 != 0 else (1, 3)
-                pady = (1, 1) if (r + 1) % 3 != 0 else (1, 3)
                 
-                cell = tk.Entry(grid_container, width=2, font=('Consolas', 16, 'bold'), 
-                                justify='center', bd=0, bg=self.bg_grid, 
-                                fg=self.color_fixed if is_orig else self.color_user,
-                                insertbackground="white")
-                cell.grid(row=r, column=c, padx=padx, pady=pady, ipady=5)
+                # Visual grouping for 3x3 blocks with neon highlights
+                bw_x = 3 if (c + 1) % 3 == 0 and c < 8 else 1
+                bw_y = 3 if (r + 1) % 3 == 0 and r < 8 else 1
+                
+                cell_container = tk.Frame(inner_grid, bg=self.neon_pink if (bw_x == 3 or bw_y == 3) else self.grid_dim)
+                cell_container.grid(row=r, column=c, padx=(0, bw_x), pady=(0, bw_y))
+                
+                cell = tk.Entry(cell_container, width=2, font=('Consolas', 18, 'bold'), 
+                                justify='center', bd=0, bg=self.bg_cell, 
+                                fg=self.neon_cyan if is_orig else self.neon_amber,
+                                insertbackground=self.neon_amber)
+                cell.pack(padx=1, pady=1, ipady=4)
                 
                 if val != 0: cell.insert(0, str(val))
-                if is_orig: cell.config(state='readonly', readonlybackground=self.bg_grid)
+                if is_orig: cell.config(state='readonly', readonlybackground=self.bg_cell)
+                
                 self.cells[(r, c)] = cell
 
     def create_controls(self):
-        # Button frame 1 (Save and Solve)
-        btn_frame1 = tk.Frame(self.root, bg=self.bg_main)
-        btn_frame1.pack(fill='x', padx=15, pady=(5, 2))
+        btn_container = tk.Frame(self.root, bg=self.bg_dark)
+        btn_container.pack(fill='x', padx=20, pady=10)
 
-        # Button frame 2 (Refresh)
-        btn_frame2 = tk.Frame(self.root, bg=self.bg_main)
-        btn_frame2.pack(fill='x', padx=15, pady=5)
-
-        def create_btn(parent, text, cmd, color):
-            btn = tk.Button(parent, text=text, command=cmd, bg=color, fg="white",
-                            font=("Arial", 8, "bold"), bd=0, pady=8, cursor="hand2",
-                            activebackground="#444", activeforeground="white")
-            btn.pack(side='left', expand=True, fill='x', padx=2)
+        def make_cyber_btn(text, cmd, color, side='top', fill='x'):
+            # Double frame for neon outline effect
+            outer = tk.Frame(btn_container, bg=color, padx=1, pady=1)
+            outer.pack(side=side, expand=True, fill=fill, pady=4, padx=2)
+            
+            btn = tk.Button(outer, text=text, command=cmd, bg=self.bg_dark, fg=color,
+                            font=("Consolas", 9, "bold"), bd=0, pady=6, cursor="hand2",
+                            activebackground=color, activeforeground=self.bg_dark)
+            btn.pack(fill='both')
+            
+            # Hover effects
+            btn.bind("<Enter>", lambda e: outer.config(bg="white"))
+            btn.bind("<Leave>", lambda e: outer.config(bg=color))
             return btn
 
-        create_btn(btn_frame1, "SAVE PROGRESS", self.save_cache, "#333333")
-        create_btn(btn_frame1, "SOLVE DAILY", self.handle_solve, "#007acc")
-        create_btn(btn_frame2, "NEW RANDOM PUZZLE", self.refresh_new_puzzle, "#444444")
+        row1 = tk.Frame(btn_container, bg=self.bg_dark)
+        row1.pack(fill='x')
+        
+        make_cyber_btn("SAVE_STATE", self.save_cache, self.neon_cyan, side='left', fill='both')
+        make_cyber_btn("EXEC_SOLVE", self.handle_solve, self.neon_magenta, side='left', fill='both')
+        make_cyber_btn("GENERATE_NEW_GRID", self.refresh_new_puzzle, self.neon_pink)
 
     def save_cache(self):
         current_state = []
@@ -169,16 +166,35 @@ class ModernSudokuWidget:
         with open(self.cache_file, 'w') as f:
             json.dump(data, f)
 
+    def refresh_new_puzzle(self):
+        new_p = self.generate_puzzle(use_daily_seed=False)
+        self.original_puzzle = [row[:] for row in new_p]
+        self.board = [row[:] for row in new_p]
+        
+        for r in range(9):
+            for c in range(9):
+                cell = self.cells[(r, c)]
+                cell.config(state='normal')
+                cell.delete(0, tk.END)
+                val = self.board[r][c]
+                if val != 0:
+                    cell.insert(0, str(val))
+                    cell.config(state='readonly', readonlybackground=self.bg_cell, fg=self.neon_cyan)
+                else:
+                    cell.config(fg=self.neon_amber)
+        self.save_cache()
+
     def handle_solve(self):
         solution = [row[:] for row in self.original_puzzle]
         if self.solve_backtrack(solution):
             for r in range(9):
                 for c in range(9):
                     if self.original_puzzle[r][c] == 0:
-                        self.cells[(r, c)].config(state='normal')
-                        self.cells[(r, c)].delete(0, tk.END)
-                        self.cells[(r, c)].insert(0, str(solution[r][c]))
-                        self.cells[(r, c)].config(fg=self.color_solve)
+                        cell = self.cells[(r, c)]
+                        cell.config(state='normal')
+                        cell.delete(0, tk.END)
+                        cell.insert(0, str(solution[r][c]))
+                        cell.config(fg=self.neon_magenta)
             self.save_cache()
 
     def solve_backtrack(self, b):
@@ -204,5 +220,5 @@ class ModernSudokuWidget:
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = ModernSudokuWidget(root)
+    app = FutureRetroSudoku(root)
     root.mainloop()
