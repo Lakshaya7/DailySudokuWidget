@@ -22,23 +22,23 @@ class ThemeableSudoku:
             },
             "Paper Ink": {
                 "bg": "#f5f5dc", "grid": "#ffffff", "line": "#000000", 
-                "fixed": "#000080", "user": "#d32f2f", "btn": "#9e9e9e", "font": "Courier"
+                "fixed": "#000080", "user": "#d32f2f", "btn": "#555555", "font": "Courier"
             },
             "Classic Grid": {
                 "bg": "#ffffff", "grid": "#ffffff", "line": "#000000", 
-                "fixed": "#000000", "user": "#0000ff", "btn": "#e0e0e0", "font": "Arial"
+                "fixed": "#000000", "user": "#0000ff", "btn": "#444444", "font": "Arial"
             },
             "Midnight OLED": {
                 "bg": "#000000", "grid": "#111111", "line": "#333333", 
-                "fixed": "#ffffff", "user": "#00ff00", "btn": "#222222", "font": "Verdana"
+                "fixed": "#ffffff", "user": "#00ff00", "btn": "#444444", "font": "Verdana"
             },
             "Forest Nature": {
                 "bg": "#1b5e20", "grid": "#2e7d32", "line": "#003300", 
-                "fixed": "#c8e6c9", "user": "#ffff00", "btn": "#4caf50", "font": "Segoe UI"
+                "fixed": "#c8e6c9", "user": "#ffff00", "btn": "#ffffff", "font": "Segoe UI"
             },
             "Royal Gold": {
                 "bg": "#1a237e", "grid": "#283593", "line": "#ffd700", 
-                "fixed": "#ffd700", "user": "#ffffff", "btn": "#3949ab", "font": "Times New Roman"
+                "fixed": "#ffd700", "user": "#ffffff", "btn": "#ffd700", "font": "Times New Roman"
             }
         }
         
@@ -54,6 +54,9 @@ class ThemeableSudoku:
         self.board = []
         self.original_puzzle = []
         
+        # Register validation for entries (only digits 1-9, max length 1)
+        self.vcmd = (self.root.register(self.validate_input), '%P')
+        
         self.load_or_generate_data()
         self.create_header()
         self.create_grid()
@@ -68,24 +71,29 @@ class ThemeableSudoku:
         self.root.bind("<Button-1>", self.start_move)
         self.root.bind("<B1-Motion>", self.do_move)
 
+    def validate_input(self, P):
+        if P == "" or (P.isdigit() and len(P) == 1 and P != '0'):
+            return True
+        return False
+
     def apply_theme(self, theme_name):
         t = self.themes[theme_name]
         self.root.configure(bg=t["bg"], highlightbackground=t["line"], highlightthickness=2)
         
         # Update Header
-        self.header_label.config(bg=t["bg"], fg=t["line"], font=(t["font"], 14, "bold"))
-        self.theme_btn.config(bg=t["bg"], fg=t["line"], font=(t["font"], 8))
-        self.close_btn.config(bg=t["bg"], fg=t["line"])
+        self.header_label.config(bg=t["bg"], fg=t["line"], font=(t["font"], 16, "bold"))
+        self.theme_btn.config(bg=t["bg"], fg=t["line"], font=(t["font"], 9, "underline"))
+        self.close_btn.config(bg=t["bg"], fg=t["line"], font=(t["font"], 12, "bold"))
         
         # Update Grid
         self.outer_grid.config(bg=t["line"])
         for (r, c), cell in self.cells.items():
             is_orig = self.original_puzzle[r][c] != 0
             
-            # Thick lines logic
+            # Thick lines logic for subgrids
             bw_x = 3 if (c + 1) % 3 == 0 and c < 8 else 1
             bw_y = 3 if (r + 1) % 3 == 0 and r < 8 else 1
-            cell.master.config(bg=t["line"]) # Container frame
+            cell.master.config(bg=t["line"]) 
             cell.master.grid_configure(padx=(0, bw_x), pady=(0, bw_y))
             
             cell.config(
@@ -96,10 +104,18 @@ class ThemeableSudoku:
                 readonlybackground=t["grid"]
             )
             
-        # Update Buttons
+        # Update Action Buttons
         for btn in self.action_buttons:
-            btn.master.config(bg=t["line"]) # Outline frame
-            btn.config(bg=t["bg"], fg=t["btn"], font=(t["font"], 8, "bold"), activebackground=t["btn"])
+            # Update the outer frame (the neon/border line)
+            btn.master.config(bg=t["line"]) 
+            # Update the button itself
+            btn.config(
+                bg=t["bg"], 
+                fg=t["btn"], 
+                font=(t["font"], 9, "bold"), 
+                activebackground=t["btn"],
+                activeforeground=t["bg"]
+            )
 
     def cycle_theme(self):
         self.current_theme_idx = (self.current_theme_idx + 1) % len(self.theme_names)
@@ -117,7 +133,7 @@ class ThemeableSudoku:
         self.root.geometry(f"+{x}+{y}")
 
     def generate_puzzle(self, use_daily_seed=True):
-        seed = int(date.today().strftime("%Y%m%d")) if use_daily_seed else random.randint(1, 1e7)
+        seed = int(date.today().strftime("%Y%m%d")) if use_daily_seed else random.randint(1, 10000000)
         random.seed(seed)
         base, side = 3, 9
         def pattern(r, c): return (base * (r % base) + r // base + c) % side
@@ -147,7 +163,7 @@ class ThemeableSudoku:
         self.original_puzzle = [row[:] for row in new_p]
 
     def create_header(self):
-        header = tk.Frame(self.root)
+        header = tk.Frame(self.root, bg="#000") # Temp bg, overwritten by apply_theme
         header.pack(fill='x', padx=20, pady=(15, 5))
         
         self.header_label = tk.Label(header, text="SUDOKU")
@@ -157,7 +173,7 @@ class ThemeableSudoku:
         self.close_btn.pack(side='right')
         self.close_btn.bind("<Button-1>", lambda e: self.root.destroy())
 
-        self.theme_btn = tk.Label(header, text=" CHANGE THEME ", cursor="hand2", pady=5)
+        self.theme_btn = tk.Label(header, text=" THEME ", cursor="hand2")
         self.theme_btn.pack(side='right', padx=10)
         self.theme_btn.bind("<Button-1>", lambda e: self.cycle_theme())
 
@@ -176,11 +192,14 @@ class ThemeableSudoku:
                 cell_container = tk.Frame(inner_grid)
                 cell_container.grid(row=r, column=c)
                 
-                cell = tk.Entry(cell_container, width=2, justify='center', bd=0)
+                cell = tk.Entry(cell_container, width=2, justify='center', bd=0, 
+                                validate='key', validatecommand=self.vcmd)
                 cell.pack(padx=1, pady=1, ipady=4)
                 
-                if val != 0: cell.insert(0, str(val))
-                if is_orig: cell.config(state='readonly')
+                if val != 0: 
+                    cell.insert(0, str(val))
+                if is_orig: 
+                    cell.config(state='readonly')
                 
                 self.cells[(r, c)] = cell
 
@@ -191,17 +210,17 @@ class ThemeableSudoku:
 
         def make_btn(text, cmd, side='top', fill='x'):
             outer = tk.Frame(self.btn_container, padx=1, pady=1)
-            outer.pack(side=side, expand=True, fill=fill, pady=2, padx=2)
-            btn = tk.Button(outer, text=text, command=cmd, bd=0, pady=5, cursor="hand2")
+            outer.pack(side=side, expand=True, fill=fill, pady=3, padx=2)
+            btn = tk.Button(outer, text=text, command=cmd, bd=0, pady=6, cursor="hand2")
             btn.pack(fill='both')
             self.action_buttons.append(btn)
             return btn
 
-        row1 = tk.Frame(self.btn_container)
+        row1 = tk.Frame(self.btn_container, bg=self.root["bg"])
         row1.pack(fill='x')
         
         make_btn("SAVE PROGRESS", self.save_cache, side='left', fill='both')
-        make_btn("SOLVE DAILY", self.handle_solve, side='left', fill='both')
+        make_btn("SOLVE NOW", self.handle_solve, side='left', fill='both')
         make_btn("NEW RANDOM GRID", self.refresh_new_puzzle)
 
     def save_cache(self):
@@ -220,20 +239,37 @@ class ThemeableSudoku:
         new_p = self.generate_puzzle(use_daily_seed=False)
         self.original_puzzle = [row[:] for row in new_p]
         self.board = [row[:] for row in new_p]
-        self.current_theme_idx -= 1 # Keep same theme
-        self.cycle_theme()
+        
+        # Reset UI
+        for r in range(9):
+            for c in range(9):
+                cell = self.cells[(r, c)]
+                cell.config(state='normal')
+                cell.delete(0, tk.END)
+                val = self.board[r][c]
+                if val != 0:
+                    cell.insert(0, str(val))
+                    cell.config(state='readonly')
+        
+        # Re-apply current theme to ensure colors are right for the new readonly states
+        self.apply_theme(self.theme_names[self.current_theme_idx])
+        self.save_cache()
 
     def handle_solve(self):
+        # Create a working copy of the original board
         solution = [row[:] for row in self.original_puzzle]
         if self.solve_backtrack(solution):
             for r in range(9):
                 for c in range(9):
+                    cell = self.cells[(r, c)]
+                    # Only update if it wasn't part of the original puzzle
                     if self.original_puzzle[r][c] == 0:
-                        cell = self.cells[(r, c)]
                         cell.config(state='normal')
                         cell.delete(0, tk.END)
                         cell.insert(0, str(solution[r][c]))
             self.save_cache()
+        else:
+            messagebox.showinfo("Sudoku", "This puzzle has no solution.")
 
     def solve_backtrack(self, b):
         for r in range(9):
